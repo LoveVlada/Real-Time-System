@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdbool.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,6 +43,9 @@
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+uint8_t str[1];
+bool RxCompleted = false;
+bool TxCompleted = true;
 
 /* USER CODE END PV */
 
@@ -50,13 +53,13 @@ UART_HandleTypeDef huart1;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
-static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
 /* USER CODE END 0 */
 
 /**
@@ -88,19 +91,33 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
-
-  /* Initialize interrupts */
-  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_UART_Receive_IT(&huart1, str, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if (str[0] == '0') HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+	  if (str[0] == '1') HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
 
-	  HAL_UART_Transmit_IT(&huart1, (uint8_t*)"First message\n\r", sizeof("First message\n\r"));
+	  if (str[0] == '2') HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+	  if (str[0] == '3') HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+
+	  if (str[0] == '4') HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET);
+	  if (str[0] == '5') HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+
+	  if (str[0] == '6') HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_RESET);
+	  if (str[0] == '7') HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
+
+	  if (str[0] == 'q') {
+		  HAL_GPIO_TogglePin(LED5_GPIO_Port, LED5_Pin);
+		  str[0] = 'z';
+	  }
+
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -141,17 +158,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief NVIC Configuration.
-  * @retval None
-  */
-static void MX_NVIC_Init(void)
-{
-  /* EXTI15_10_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 /**
@@ -197,16 +203,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PA12 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, LED2_Pin|LED3_Pin|LED4_Pin|LED5_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LED1_Pin */
   GPIO_InitStruct.Pin = LED1_Pin;
@@ -215,41 +220,40 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED1_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : LED2_Pin LED3_Pin LED4_Pin LED5_Pin */
+  GPIO_InitStruct.Pin = LED2_Pin|LED3_Pin|LED4_Pin|LED5_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
-int num = 0;
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if(huart == &huart1) {
+		RxCompleted = true;
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-	num = 0;
-	HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+		if (TxCompleted == true) {
+			TxCompleted = false;
+			HAL_UART_Transmit_IT(&huart1, str, 1);
+		}
+	}
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
+	if(huart == &huart1) {
+		TxCompleted = true;
 
-	num = num + 1;
-	char snum1[3];
-	itoa(num, snum1, 10);
-
-
-	HAL_UART_Transmit(&huart1, (uint8_t*)"\n\rHello world ", sizeof("\n\rHello world "), 10000);
-	HAL_UART_Transmit(&huart1, (uint8_t*)snum1, sizeof(snum1), 10000);
-
-	num = num + 1;
-	char snum2[3];
-	itoa(num, snum2, 10);
-
-	HAL_UART_Transmit(&huart1, (uint8_t*)"\n\rHello students ", sizeof("\n\rHello students "), 10000);
-	HAL_UART_Transmit_IT(&huart1, (uint8_t*)snum2, sizeof(snum2));
-
-
-
-
-
-
-	//HAL_UART_Transmit_IT(&huart1, (uint8_t*)"Hello Students\n\r", sizeof("Hello Students\n\r"));
+		if (RxCompleted == true) {
+			RxCompleted = false;
+			HAL_UART_Receive_IT(&huart1, str, 1);
+		}
+	}
 }
+
 
 /* USER CODE END 4 */
 
@@ -264,7 +268,6 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
-
   }
   /* USER CODE END Error_Handler_Debug */
 }
